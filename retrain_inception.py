@@ -95,7 +95,7 @@ def main(args):
     with tf.Session() as sess:
         sess.run(tf.initialize_all_variables())
 
-        checkpoint_path = os.path.join(args.model_dir, 'checkpoint')
+        checkpoint_path = os.path.join(args.model_dir, 'model.checkpoint')
         if os.path.isfile(checkpoint_path):
             print('Loading checkpoint')
             saver.restore(sess, checkpoint_path)
