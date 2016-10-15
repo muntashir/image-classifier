@@ -95,10 +95,10 @@ def main(args):
     with tf.Session() as sess:
         sess.run(tf.initialize_all_variables())
 
-        checkpoint_path = os.path.join(args.model_dir, 'model.checkpoint')
-        if os.path.isfile(checkpoint_path):
+        checkpoint_state = tf.train.get_checkpoint_state(args.model_dir)
+        if checkpoint_state and checkpoint_state.model_checkpoint_path:
             print('Loading checkpoint')
-            saver.restore(sess, checkpoint_path)
+            saver.restore(sess, checkpoint_state.model_checkpoint_path)
 
         print('Setting up validation')
         images_validation, labels_validation = \
@@ -123,13 +123,15 @@ def main(args):
                 feed_dict = {input_tensor: features,
                              label_tensor: labels})
 
-            print('Step: %i - Loss: %f' % (i, loss))
+            print('Step: %i - Loss: %f' % (i + 1, loss))
 
             if (i + 1) % args.checkpoint_interval == 0:
                 print('Saving checkpoint')
+                checkpoint_path = os.path.join(args.model_dir, 'model.checkpoint')
                 saver.save(
                     sess,
-                    checkpoint_path)
+                    checkpoint_path,
+                    global_step= i + 1)
 
                 print('Running validation')
                 validation_accuracy = sess.run(
