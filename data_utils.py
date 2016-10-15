@@ -9,7 +9,7 @@ def download_and_extract_tar(url, dir):
     if not os.path.exists(dir):
         os.makedirs(dir)
 
-    filename = url.split('/')[-1]
+    filename = url.split(os.sep)[-1]
     filepath = os.path.join(dir, filename)
 
     if not os.path.exists(filepath):
@@ -65,7 +65,7 @@ def build_dataset_object(data_dir, **args):
             if data_dir == folder:
                 continue
 
-            image_class = folder.split('/')[-1]
+            image_class = folder.split(os.sep)[-1]
             dataset['index_to_label'].append(image_class)
 
             for filename in filenames:
@@ -98,3 +98,17 @@ def read_image(image_path):
 
 def get_minibatch(data, batch_size):
     return random.sample(data, batch_size)
+
+def save_values(values, filename):
+    out_string = ','.join(str(x) for x in values)
+    with open(filename, 'w') as out_file:
+        out_file.write(out_string)
+
+def load_values(filename):
+    if os.path.exists(filename):
+        with open(filename, 'r') as in_file:
+            in_string = in_file.read()
+        values = [float(x) for x in in_string.split(',')]
+        return values
+    else:
+        return None

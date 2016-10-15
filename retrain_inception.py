@@ -21,7 +21,7 @@ def load_model(model_path):
 
         return input_tensor, bottleneck_tensor
 
-def get_features(sess, images, input_image_op, bottleneck_tensor, label_to_index):
+def get_features(sess, images, input_image_op, bottleneck_tensor, label_to_index, model_dir):
     batch_size = len(images)
     num_labels = len(label_to_index)
     features_size = bottleneck_tensor.get_shape()[0]
@@ -30,12 +30,23 @@ def get_features(sess, images, input_image_op, bottleneck_tensor, label_to_index
     labels = np.zeros((batch_size, num_labels))
 
     for i, image in enumerate(images):
-        image_data = data_utils.read_image(image['image_path'])
+        feature_cache_dir = os.path.join(model_dir, 'cache')
+        if not os.path.exists(feature_cache_dir):
+            os.makedirs(feature_cache_dir)
+        feature_cache_path = os.path.join(feature_cache_dir, image['image_path'].split(os.sep)[-1] + '.feat')
+        feature_cache = data_utils.load_values(feature_cache_path)
+
+        if feature_cache:
+            features[i, :] = feature_cache
+        else:
+            image_data = data_utils.read_image(image['image_path'])
+            feature = sess.run(
+                bottleneck_tensor,
+                feed_dict = {input_image_op: image_data})
+            data_utils.save_values(feature, feature_cache_path)
+            features[i, :] = feature
+
         label = image['label']
-        feature = sess.run(
-            bottleneck_tensor,
-            feed_dict = {input_image_op: image_data})
-        features[i, :] = feature
         labels[i, label_to_index[label]] = 1
 
     return (features, labels)
@@ -107,7 +118,8 @@ def main(args):
                 dataset['validation'],
                 input_image_op,
                 bottleneck_tensor,
-                dataset['label_to_index'])
+                dataset['label_to_index'],
+                args.model_dir)
 
         for i in range(args.steps):
             images = data_utils.get_minibatch(dataset['train'], args.batch_size)
@@ -117,7 +129,8 @@ def main(args):
                     images,
                     input_image_op,
                     bottleneck_tensor,
-                    dataset['label_to_index'])
+                    dataset['label_to_index'],
+                    args.model_dir)
             loss, _ = sess.run(
                 [mean_loss, train_step],
                 feed_dict = {input_tensor: features,
@@ -150,7 +163,8 @@ def main(args):
                 dataset['test'],
                 input_image_op,
                 bottleneck_tensor,
-                dataset['label_to_index'])
+                dataset['label_to_index'],
+                args.model_dir)
         test_accuracy = sess.run(
             accuracy,
             feed_dict = {input_tensor: images_test,
@@ -189,7 +203,7 @@ if __name__ == '__main__':
         '-c',
         '--checkpoint-interval',
         help='Checkpoint training after these many steps',
-        default=500,
+        default=100,
         type=int,
         dest='checkpoint_interval')
     main(parser.parse_args())
