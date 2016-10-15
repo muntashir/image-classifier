@@ -174,17 +174,20 @@ if __name__ == '__main__':
         '--batch-size',
         help='The batch size',
         default=10,
+        type=int,
         dest='batch_size')
     parser.add_argument(
         '-s',
         '--steps',
         help='How many steps to run for',
         default=5000,
+        type=int,
         dest='steps')
     parser.add_argument(
         '-c',
         '--checkpoint-interval',
         help='Checkpoint training after these many steps',
         default=500,
+        type=int,
         dest='checkpoint_interval')
     main(parser.parse_args())
