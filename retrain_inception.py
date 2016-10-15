@@ -105,10 +105,11 @@ def main(args):
                     input_image_op,
                     bottleneck_tensor,
                     dataset['label_to_index'])
-            sess.run(
+            loss, _ = sess.run(
                 [mean_loss, train_step],
                 feed_dict = {input_tensor: features,
                              label_tensor: labels})
+            print('Loss %f' % loss)
 
         images_validation, labels_validation = \
             get_features(
