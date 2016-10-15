@@ -6,8 +6,6 @@ import os
 
 DATA_URL = 'http://vision.stanford.edu/aditya86/ImageNetDogs/images.tar'
 INCEPTION_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
-DEFAULT_BATCH_SIZE = 10
-DEFAULT_STEPS = 5000
 
 def load_model(model_path):
     with open(model_path, 'rb') as model:
@@ -64,8 +62,8 @@ def add_new_layer(features_size, num_labels):
     train_step = tf.train.AdamOptimizer().minimize(mean_loss)
 
     correct_prediction = tf.equal(
-        tf.argmax(softmax_output,1),
-        tf.argmax(label_tensor,1))
+        tf.argmax(softmax_output, 1),
+        tf.argmax(label_tensor, 1))
 
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
@@ -80,7 +78,7 @@ def main(args):
         os.path.join(args.data_dir, 'Images'),
         test_percent = 0.1,
         training_percent = 0.1,
-        force_rebuild = True)
+        force_rebuild = False)
 
     model_path = (os.path.join(args.model_dir, 'classify_image_graph_def.pb'))
     input_image_op, bottleneck_tensor = load_model(model_path)
@@ -92,11 +90,26 @@ def main(args):
     input_tensor, label_tensor, train_step, mean_loss, accuracy = \
         add_new_layer(features_size, num_labels)
 
+    saver = tf.train.Saver()
+
     with tf.Session() as sess:
         sess.run(tf.initialize_all_variables())
 
+        checkpoint_path = os.path.join(args.model_dir, 'checkpoint')
+        if os.path.isfile(checkpoint_path):
+            print('Loading checkpoint')
+            saver.restore(sess, checkpoint_path)
+
+        print('Setting up validation')
+        images_validation, labels_validation = \
+            get_features(
+                sess,
+                dataset['validation'],
+                input_image_op,
+                bottleneck_tensor,
+                dataset['label_to_index'])
+
         for i in range(args.steps):
-            print('Step %i' % i)
             images = data_utils.get_minibatch(dataset['train'], args.batch_size)
             features, labels = \
                 get_features(
@@ -109,20 +122,38 @@ def main(args):
                 [mean_loss, train_step],
                 feed_dict = {input_tensor: features,
                              label_tensor: labels})
-            print('Loss %f' % loss)
 
-        images_validation, labels_validation = \
+            print('Step: %i - Loss: %f' % (i, loss))
+
+            if (i + 1) % args.checkpoint_interval == 0:
+                print('Saving checkpoint')
+                saver.save(
+                    sess,
+                    checkpoint_path)
+
+                print('Running validation')
+                validation_accuracy = sess.run(
+                    accuracy,
+                    feed_dict = {input_tensor: images_validation,
+                                label_tensor: labels_validation})
+                print('Validation accuracy: %f' % validation_accuracy)
+
+        print('Saving model')
+        tf.train.export_meta_graph(filename=os.path.join(args.model_dir, 'model.graph'))
+
+        print('Running test')
+        images_test, labels_test = \
             get_features(
                 sess,
-                dataset['validation'],
+                dataset['test'],
                 input_image_op,
                 bottleneck_tensor,
                 dataset['label_to_index'])
-        validation_accuracy = sess.run(
+        test_accuracy = sess.run(
             accuracy,
-            feed_dict = {input_tensor: images_validation,
-                         label_tensor: labels_validation})
-        print(validation_accuracy)
+            feed_dict = {input_tensor: images_test,
+                         label_tensor: labels_test})
+        print('Test accuracy: %f' % test_accuracy)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Trains the model')
@@ -142,12 +173,18 @@ if __name__ == '__main__':
         '-b',
         '--batch-size',
         help='The batch size',
-        default=DEFAULT_BATCH_SIZE,
+        default=10,
         dest='batch_size')
     parser.add_argument(
         '-s',
         '--steps',
         help='How many steps to run for',
-        default=DEFAULT_STEPS,
+        default=5000,
         dest='steps')
+    parser.add_argument(
+        '-c',
+        '--checkpoint-interval',
+        help='Checkpoint training after these many steps',
+        default=500,
+        dest='checkpoint_interval')
     main(parser.parse_args())
