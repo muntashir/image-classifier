@@ -151,7 +151,7 @@ def main(args):
                     accuracy,
                     feed_dict = {input_tensor: images_validation,
                                 label_tensor: labels_validation})
-                print('Validation accuracy: %f%' % validation_accuracy * 100)
+                print('Validation accuracy: %f%%' % (float(validation_accuracy) * 100.0))
 
         print('Saving model')
         tf.train.export_meta_graph(filename=os.path.join(args.model_dir, 'model.graph'))
@@ -169,7 +169,7 @@ def main(args):
             accuracy,
             feed_dict = {input_tensor: images_test,
                          label_tensor: labels_test})
-        print('Test accuracy: %f%' % test_accuracy * 100)
+        print('Test accuracy: %f%%' % (float(test_accuracy) * 100.0))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Trains the model')
