@@ -42,13 +42,15 @@ def download_and_extract_tar(url, dir):
         print('%s already exists' % filename)
 
 def build_dataset_object(data_dir, **args):
-    dataset_cache_file = os.path.join(data_dir, 'dataset.json')
+    dataset_filepath = os.path.join(data_dir, 'dataset.json')
+    index_filepath = os.path.join(data_dir, 'index_to_label')
+
     force_rebuild = args.get('force_rebuild', False)
 
-    if os.path.isfile(dataset_cache_file) and not force_rebuild:
+    if os.path.isfile(dataset_filepath) and not force_rebuild:
         print("Loading data split and labels from cache")
 
-        with open(dataset_cache_file) as dataset_file:
+        with open(dataset_filepath) as dataset_file:
             dataset = json.load(dataset_file)
             return dataset
     else:
@@ -86,10 +88,21 @@ def build_dataset_object(data_dir, **args):
         dataset['train'] = images_and_labels[test_slice:validation_slice]
         dataset['validation'] = images_and_labels[validation_slice:]
 
-        with open(dataset_cache_file, 'w') as dataset_file:
+        with open(dataset_filepath, 'w') as dataset_file:
             json.dump(dataset, dataset_file)
 
+        index_to_label = {}
+        index_to_label['index_to_label'] = dataset['index_to_label'] 
+
+        with open(index_filepath, 'w') as index_file:
+            json.dump(index_to_label, index_file)
+
         return dataset
+
+def load_index_file(index_path):
+    with open(index_path) as index_file:
+        index_to_label = json.load(index_file)
+        return index_to_label['index_to_label']
 
 def read_image(image_path):
     with open(image_path, 'rb') as image_file:
@@ -99,12 +112,12 @@ def read_image(image_path):
 def get_minibatch(data, batch_size):
     return random.sample(data, batch_size)
 
-def save_values(values, filename):
+def save_array(values, filename):
     out_string = ','.join(str(x) for x in values)
     with open(filename, 'w') as out_file:
         out_file.write(out_string)
 
-def load_values(filename):
+def load_array(filename):
     if os.path.exists(filename):
         with open(filename, 'r') as in_file:
             in_string = in_file.read()

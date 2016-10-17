@@ -1,58 +1,13 @@
 import tensorflow as tf
-import numpy as np
 import data_utils
+import tf_utils
 import argparse
 import os
 
 DATA_URL = 'http://vision.stanford.edu/aditya86/ImageNetDogs/images.tar'
-INCEPTION_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
-
-def load_model(model_path):
-    with open(model_path, 'rb') as model:
-        graph_def = tf.GraphDef()
-        graph_def.ParseFromString(model.read())
-        input_tensor, bottleneck_tensor = tf.import_graph_def(
-            graph_def,
-            name = '',
-            return_elements = [
-                'DecodeJpeg/contents:0',
-                'pool_3:0'
-            ])
-
-        return input_tensor, bottleneck_tensor
-
-def get_features(sess, images, input_image_op, bottleneck_tensor, label_to_index, model_dir):
-    batch_size = len(images)
-    num_labels = len(label_to_index)
-    features_size = bottleneck_tensor.get_shape()[0]
-
-    features = np.zeros((batch_size, features_size))
-    labels = np.zeros((batch_size, num_labels))
-
-    for i, image in enumerate(images):
-        feature_cache_dir = os.path.join(model_dir, 'cache')
-        if not os.path.exists(feature_cache_dir):
-            os.makedirs(feature_cache_dir)
-        feature_cache_path = os.path.join(feature_cache_dir, image['image_path'].split(os.sep)[-1] + '.feat')
-        feature_cache = data_utils.load_values(feature_cache_path)
-
-        if feature_cache:
-            features[i, :] = feature_cache
-        else:
-            image_data = data_utils.read_image(image['image_path'])
-            feature = sess.run(
-                bottleneck_tensor,
-                feed_dict = {input_image_op: image_data})
-            data_utils.save_values(feature, feature_cache_path)
-            features[i, :] = feature
-
-        label = image['label']
-        labels[i, label_to_index[label]] = 1
-
-    return (features, labels)
 
 def add_new_layer(features_size, num_labels):
-    input_tensor = tf.placeholder(tf.float32, shape=[None, features_size])
+    input_tensor = tf.placeholder(tf.float32, shape=[None, features_size], name='input_tensor')
     label_tensor = tf.placeholder(tf.float32, shape=[None, num_labels])
 
     W = tf.get_variable(
@@ -67,6 +22,7 @@ def add_new_layer(features_size, num_labels):
 
     logits = tf.matmul(input_tensor, W) + b
     softmax_output = tf.nn.softmax(logits)
+    result_index = tf.argmax(softmax_output, 1, name='result_index')
 
     loss = tf.nn.softmax_cross_entropy_with_logits(logits, label_tensor)
     mean_loss = tf.reduce_mean(loss)
@@ -82,20 +38,19 @@ def add_new_layer(features_size, num_labels):
 
 def main(args):
     data_utils.download_and_extract_tar(DATA_URL, args.data_dir)
-    data_utils.download_and_extract_tar(INCEPTION_URL, args.model_dir)
-    tmp_dir = os.path.join(args.model_dir, 'tmp')
+    data_utils.download_and_extract_tar(tf_utils.INCEPTION_URL, args.model_dir)
 
     dataset = data_utils.build_dataset_object(
         os.path.join(args.data_dir, 'Images'),
         test_percent = 0.1,
         training_percent = 0.1,
-        force_rebuild = False)
+        force_rebuild = args.force_rebuild)
 
     model_path = (os.path.join(args.model_dir, 'classify_image_graph_def.pb'))
-    input_image_op, bottleneck_tensor = load_model(model_path)
-    bottleneck_tensor = tf.reshape(bottleneck_tensor, [-1])
+    input_image_op, inception_tensor = tf_utils.load_inception(model_path)
+    inception_tensor = tf.reshape(inception_tensor, [-1])
 
-    features_size = bottleneck_tensor.get_shape()[0]
+    features_size = inception_tensor.get_shape()[0]
     num_labels = len(dataset['label_to_index'])
 
     input_tensor, label_tensor, train_step, mean_loss, accuracy = \
@@ -113,22 +68,22 @@ def main(args):
 
         print('Setting up validation')
         images_validation, labels_validation = \
-            get_features(
+            tf_utils.get_features(
                 sess,
                 dataset['validation'],
                 input_image_op,
-                bottleneck_tensor,
+                inception_tensor,
                 dataset['label_to_index'],
                 args.model_dir)
 
         for i in range(args.steps):
             images = data_utils.get_minibatch(dataset['train'], args.batch_size)
             features, labels = \
-                get_features(
+                tf_utils.get_features(
                     sess,
                     images,
                     input_image_op,
-                    bottleneck_tensor,
+                    inception_tensor,
                     dataset['label_to_index'],
                     args.model_dir)
             loss, _ = sess.run(
@@ -144,7 +99,7 @@ def main(args):
                 saver.save(
                     sess,
                     checkpoint_path,
-                    global_step= i + 1)
+                    global_step = i + 1)
 
                 print('Running validation')
                 validation_accuracy = sess.run(
@@ -154,15 +109,15 @@ def main(args):
                 print('Validation accuracy: %f%%' % (float(validation_accuracy) * 100.0))
 
         print('Saving model')
-        tf.train.export_meta_graph(filename=os.path.join(args.model_dir, 'model.graph'))
+        saver.save(sess, os.path.join(args.model_dir, 'model.graph'))
 
         print('Running test')
         images_test, labels_test = \
-            get_features(
+            tf_utils.get_features(
                 sess,
                 dataset['test'],
                 input_image_op,
-                bottleneck_tensor,
+                inception_tensor,
                 dataset['label_to_index'],
                 args.model_dir)
         test_accuracy = sess.run(
@@ -206,4 +161,10 @@ if __name__ == '__main__':
         default=100,
         type=int,
         dest='checkpoint_interval')
+    parser.add_argument(
+        '-r',
+        '--rebuild',
+        help='Forces a rescan of the training data and generates a new train/test/validation split',
+        action='store_true',
+        dest='force_rebuild')
     main(parser.parse_args())
