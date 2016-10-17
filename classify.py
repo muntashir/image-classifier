@@ -32,7 +32,7 @@ def main(args):
         print('Result: %s' % index_to_label[result[0]])
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Trains the model')
+    parser = argparse.ArgumentParser(description='Classifies an image')
     parser.add_argument(
         '-l',
         '--labels-path',
