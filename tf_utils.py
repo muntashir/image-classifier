@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import data_utils
+import sys
 import os
 
 INCEPTION_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
@@ -45,6 +46,9 @@ def get_features(sess,
     labels = np.zeros((batch_size, num_labels))
 
     for i, image in enumerate(images):
+        sys.stdout.write('\rRunning pretrained model on image %i/%i' % (i + 1, batch_size))
+        sys.stdout.flush()
+
         if (model_dir):
             feature_cache_dir = os.path.join(model_dir, 'cache')
         else:
@@ -62,14 +66,14 @@ def get_features(sess,
         else:
             image_data = data_utils.read_image(image['image_path'])
 
-            if b'\x89PNG' in image_data:
+            if b'\x89PNG' in image_data[:4]:
                 decoded_image = sess.run(
                     decoded_png,
                     feed_dict = {png_input: image_data})
                 feature = sess.run(
                     features_tensor,
                     feed_dict = {decoded_image_input: decoded_image})
-            elif b'\xff\xd8\xff' in image_data:
+            elif b'\xff\xd8\xff' in image_data[:4]:
                 decoded_image = sess.run(
                     decoded_jpg,
                     feed_dict = {jpg_input: image_data})
@@ -86,4 +90,5 @@ def get_features(sess,
         label = image['label']
         labels[i, label_to_index[label]] = 1
 
+    print()
     return (features, labels)

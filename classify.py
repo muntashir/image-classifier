@@ -26,14 +26,14 @@ def main(args):
         input_tensor = tf.get_default_graph().get_tensor_by_name('input_tensor:0')
         result_index = tf.get_default_graph().get_tensor_by_name('result_index:0')
 
-        if b'\x89PNG' in image_data:
+        if b'\x89PNG' in image_data[:4]:
             decoded_image = sess.run(
                 decoded_png,
                 feed_dict = {png_input: image_data})
             features = sess.run(
                 features_tensor,
                 feed_dict = {decoded_image_input: decoded_image})
-        elif b'\xff\xd8\xff' in image_data:
+        elif b'\xff\xd8\xff' in image_data[:4]:
             decoded_image = sess.run(
                 decoded_jpg,
                 feed_dict = {jpg_input: image_data})
