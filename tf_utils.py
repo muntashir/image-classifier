@@ -69,13 +69,16 @@ def get_features(sess,
                 feature = sess.run(
                     features_tensor,
                     feed_dict = {decoded_image_input: decoded_image})
-            elif b'\xff\xd8\xff\xe0' in image_data:
+            elif b'\xff\xd8\xff' in image_data:
                 decoded_image = sess.run(
                     decoded_jpg,
                     feed_dict = {jpg_input: image_data})
                 feature = sess.run(
                     features_tensor,
                     feed_dict = {decoded_image_input: decoded_image})
+            else:
+                print()
+                print(image_data[:4])
 
             data_utils.save_array(feature, feature_cache_path)
             features[i, :] = feature

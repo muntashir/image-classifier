@@ -33,13 +33,16 @@ def main(args):
             features = sess.run(
                 features_tensor,
                 feed_dict = {decoded_image_input: decoded_image})
-        elif b'\xff\xd8\xff\xe0' in image_data:
+        elif b'\xff\xd8\xff' in image_data:
             decoded_image = sess.run(
                 decoded_jpg,
                 feed_dict = {jpg_input: image_data})
             features = sess.run(
                 features_tensor,
                 feed_dict = {decoded_image_input: decoded_image})
+        else:
+            print('Unsupported image')
+            print(image_data[:4])
 
         features = np.reshape(features, (1, len(features)))   
 
