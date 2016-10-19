@@ -46,8 +46,9 @@ def get_features(sess,
     labels = np.zeros((batch_size, num_labels))
 
     for i, image in enumerate(images):
-        sys.stdout.write('\rRunning pretrained model on image %i/%i' % (i + 1, batch_size))
-        sys.stdout.flush()
+        if batch_size > 500:
+            sys.stdout.write('\rRunning pretrained model on image %i/%i' % (i + 1, batch_size))
+            sys.stdout.flush()
 
         if (model_dir):
             feature_cache_dir = os.path.join(model_dir, 'cache')
@@ -81,7 +82,8 @@ def get_features(sess,
                     features_tensor,
                     feed_dict = {decoded_image_input: decoded_image})
             else:
-                print()
+                if batch_size > 500:
+                    print()
                 print(image_data[:4])
 
             data_utils.save_array(feature, feature_cache_path)
@@ -90,5 +92,6 @@ def get_features(sess,
         label = image['label']
         labels[i, label_to_index[label]] = 1
 
-    print()
+    if batch_size > 500:
+        print()
     return (features, labels)
