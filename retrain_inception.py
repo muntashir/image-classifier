@@ -106,7 +106,7 @@ def main(args):
 
             if (i + 1) % args.checkpoint_interval == 0:
                 print()
-                print('Saving checkpoint')
+                print('Saving checkpoint - Step: %i' % (i + 1))
                 checkpoint_path = os.path.join(args.model_dir, 'model.checkpoint')
                 saver.save(
                     sess,
