@@ -2,6 +2,7 @@ import tensorflow as tf
 import data_utils
 import tf_utils
 import argparse
+import sys
 import os
 
 DATA_URL = 'http://vision.stanford.edu/aditya86/ImageNetDogs/images.tar'
@@ -47,10 +48,10 @@ def main(args):
         force_rebuild = args.force_rebuild)
 
     model_path = (os.path.join(args.model_dir, 'classify_image_graph_def.pb'))
-    input_image_op, inception_tensor = tf_utils.load_inception(model_path)
-    inception_tensor = tf.reshape(inception_tensor, [-1])
+    jpg_input, decoded_jpg, png_input, decoded_png, decoded_image_input, features_tensor = \
+        tf_utils.load_inception(model_path)
 
-    features_size = inception_tensor.get_shape()[0]
+    features_size = features_tensor.get_shape()[0]
     num_labels = len(dataset['label_to_index'])
 
     input_tensor, label_tensor, train_step, mean_loss, accuracy = \
@@ -71,8 +72,12 @@ def main(args):
             tf_utils.get_features(
                 sess,
                 dataset['validation'],
-                input_image_op,
-                inception_tensor,
+                jpg_input,
+                decoded_jpg,
+                png_input,
+                decoded_png,
+                decoded_image_input,
+                features_tensor,
                 dataset['label_to_index'],
                 args.model_dir)
 
@@ -82,18 +87,25 @@ def main(args):
                 tf_utils.get_features(
                     sess,
                     images,
-                    input_image_op,
-                    inception_tensor,
+                    jpg_input,
+                    decoded_jpg,
+                    png_input,
+                    decoded_png,
+                    decoded_image_input,
+                    features_tensor,
                     dataset['label_to_index'],
                     args.model_dir)
             loss, _ = sess.run(
                 [mean_loss, train_step],
                 feed_dict = {input_tensor: features,
                              label_tensor: labels})
-
-            print('Step: %i - Loss: %f' % (i + 1, loss))
+            
+            if args.verbose:
+                sys.stdout.write('\rStep: %i - Loss: %f' % (i + 1, loss))
+                sys.stdout.flush()
 
             if (i + 1) % args.checkpoint_interval == 0:
+                print()
                 print('Saving checkpoint')
                 checkpoint_path = os.path.join(args.model_dir, 'model.checkpoint')
                 saver.save(
@@ -108,6 +120,7 @@ def main(args):
                                 label_tensor: labels_validation})
                 print('Validation accuracy: %f%%' % (float(validation_accuracy) * 100.0))
 
+        print()
         print('Saving model')
         saver.save(sess, os.path.join(args.model_dir, 'model.graph'))
 
@@ -116,8 +129,12 @@ def main(args):
             tf_utils.get_features(
                 sess,
                 dataset['test'],
-                input_image_op,
-                inception_tensor,
+                jpg_input,
+                decoded_jpg,
+                png_input,
+                decoded_png,
+                decoded_image_input,
+                features_tensor,
                 dataset['label_to_index'],
                 args.model_dir)
         test_accuracy = sess.run(
@@ -167,4 +184,10 @@ if __name__ == '__main__':
         help='Forces a rescan of the training data and generates a new train/test/validation split',
         action='store_true',
         dest='force_rebuild')
+    parser.add_argument(
+        '-v',
+        '--verbose',
+        help='Prints the loss after every training step',
+        action='store_true',
+        dest='verbose')
     main(parser.parse_args())

@@ -6,29 +6,47 @@ import os
 
 def main(args):
     image_data = data_utils.read_image(args.image_path)
-    saver = tf.train.import_meta_graph(args.model_path + '.meta')
     index_to_label = data_utils.load_index_file(os.path.join(args.label_path, 'index_to_label'))
+
+    saver = tf.train.import_meta_graph(args.model_path + '.meta')
 
     with tf.Session() as sess:
         saver.restore(sess, args.model_path)
 
-        input_image_op = tf.get_default_graph().get_tensor_by_name('DecodeJpeg/contents:0')
-        inception_tensor = tf.get_default_graph().get_tensor_by_name('pool_3:0')
-        inception_tensor = tf.reshape(inception_tensor, [-1])
+        png_input = tf.get_default_graph().get_tensor_by_name('png_input:0')  
+        jpg_input = tf.get_default_graph().get_tensor_by_name('jpg_input:0') 
+
+        decoded_png = tf.get_default_graph().get_tensor_by_name('decoded_png:0')  
+        decoded_jpg = tf.get_default_graph().get_tensor_by_name('decoded_jpg:0') 
+
+        decoded_image_input = tf.get_default_graph().get_tensor_by_name('DecodeJpeg:0')
+        features_tensor = tf.get_default_graph().get_tensor_by_name('pool_3:0')
+        features_tensor = tf.reshape(features_tensor, [-1])
 
         input_tensor = tf.get_default_graph().get_tensor_by_name('input_tensor:0')
         result_index = tf.get_default_graph().get_tensor_by_name('result_index:0')
 
-        features = sess.run(
-            inception_tensor,
-            feed_dict = {input_image_op: image_data})
+        if b'\x89PNG' in image_data:
+            decoded_image = sess.run(
+                decoded_png,
+                feed_dict = {png_input: image_data})
+            features = sess.run(
+                features_tensor,
+                feed_dict = {decoded_image_input: decoded_image})
+        elif b'\xff\xd8\xff\xe0' in image_data:
+            decoded_image = sess.run(
+                decoded_jpg,
+                feed_dict = {jpg_input: image_data})
+            features = sess.run(
+                features_tensor,
+                feed_dict = {decoded_image_input: decoded_image})
 
         features = np.reshape(features, (1, len(features)))   
 
         result = sess.run(
             result_index,
             feed_dict = {input_tensor: features})
-    
+
         print('Result: %s' % index_to_label[result[0]])
 
 if __name__ == '__main__':
