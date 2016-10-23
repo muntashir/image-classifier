@@ -48,10 +48,9 @@ def main(args):
         force_rebuild = args.force_rebuild)
 
     model_path = (os.path.join(args.model_dir, 'classify_image_graph_def.pb'))
-    jpg_input, decoded_jpg, png_input, decoded_png, decoded_image_input, features_tensor = \
-        tf_utils.load_inception(model_path)
+    pretrained_model = tf_utils.PretrainedModel(model_path)
 
-    features_size = features_tensor.get_shape()[0]
+    features_size = pretrained_model.features_tensor.get_shape()[0]
     num_labels = len(dataset['label_to_index'])
 
     input_tensor, label_tensor, train_step, mean_loss, accuracy = \
@@ -69,32 +68,12 @@ def main(args):
 
         print('Setting up validation')
         images_validation, labels_validation = \
-            tf_utils.get_features(
-                sess,
-                dataset['validation'],
-                jpg_input,
-                decoded_jpg,
-                png_input,
-                decoded_png,
-                decoded_image_input,
-                features_tensor,
-                dataset['label_to_index'],
-                args.model_dir)
+            pretrained_model.run(sess, dataset['validation'], dataset['label_to_index'], args.model_dir)
 
         for i in range(args.steps):
             images = data_utils.get_minibatch(dataset['train'], args.batch_size)
             features, labels = \
-                tf_utils.get_features(
-                    sess,
-                    images,
-                    jpg_input,
-                    decoded_jpg,
-                    png_input,
-                    decoded_png,
-                    decoded_image_input,
-                    features_tensor,
-                    dataset['label_to_index'],
-                    args.model_dir)
+                pretrained_model.run(sess, images, dataset['label_to_index'], args.model_dir)
             loss, _ = sess.run(
                 [mean_loss, train_step],
                 feed_dict = {input_tensor: features,
@@ -126,17 +105,7 @@ def main(args):
 
         print('Running test')
         images_test, labels_test = \
-            tf_utils.get_features(
-                sess,
-                dataset['test'],
-                jpg_input,
-                decoded_jpg,
-                png_input,
-                decoded_png,
-                decoded_image_input,
-                features_tensor,
-                dataset['label_to_index'],
-                args.model_dir)
+            pretrained_model.run(sess, dataset['test'], dataset['label_to_index'], args.model_dir)
         test_accuracy = sess.run(
             accuracy,
             feed_dict = {input_tensor: images_test,
